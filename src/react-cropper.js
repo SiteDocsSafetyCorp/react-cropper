@@ -1,177 +1,346 @@
-import React from 'react';
-import $ from 'jquery';
-import 'cropper';
-import 'cropper/dist/cropper.css';
+import React, { Component, PropTypes } from 'react';
+import Cropper from 'cropperjs';
 
-const Cropper = React.createClass({
+import ReactDOM from 'react-dom';
 
-  propTypes: {
-    // react cropper options
-    crossOrigin: React.PropTypes.string,
-    src: React.PropTypes.string,
-    alt: React.PropTypes.string,
+const optionProps = [
+  'dragMode',
+  'aspectRatio',
+  'data',
+  // unchangeable props start from here
+  'viewMode',
+  'preview',
+  'responsive',
+  'restore',
+  'checkCrossOrigin',
+  'checkOrientation',
+  'modal',
+  'guides',
+  'center',
+  'highlight',
+  'background',
+  'autoCrop',
+  'autoCropArea',
+  'movable',
+  'rotatable',
+  'scalable',
+  'zoomable',
+  'zoomOnTouch',
+  'zoomOnWheel',
+  'wheelZoomRation',
+  'cropBoxMovable',
+  'cropBoxResizable',
+  'toggleDragModeOnDblclick',
+  'minContainerWidth',
+  'minContainerHeight',
+  'minCanvasWidth',
+  'minCanvasHeight',
+  'minCropBoxWidth',
+  'minCropBoxHeight',
+  'build',
+  'built',
+  'cropstart',
+  'cropmove',
+  'cropend',
+  'crop',
+  'zoom',
+];
 
-    // cropper options
-    aspectRatio: React.PropTypes.number,
-    crop: React.PropTypes.func,
-    preview: React.PropTypes.string,
-    strict: React.PropTypes.bool,
-    responsive: React.PropTypes.bool,
-    checkImageOrigin: React.PropTypes.bool,
-    background: React.PropTypes.bool,
-    modal: React.PropTypes.bool,
-    guides: React.PropTypes.bool,
-    highlight: React.PropTypes.bool,
-    autoCrop: React.PropTypes.bool,
-    autoCropArea: React.PropTypes.number,
-    dragCrop: React.PropTypes.bool,
-    movable: React.PropTypes.bool,
-    cropBoxMovable: React.PropTypes.bool,
-    cropBoxResizable: React.PropTypes.bool,
-    doubleClickToggle: React.PropTypes.bool,
-    zoomable: React.PropTypes.bool,
-    mouseWheelZoom: React.PropTypes.bool,
-    touchDragZoom: React.PropTypes.bool,
-    rotatable: React.PropTypes.bool,
-    minContainerWidth: React.PropTypes.number,
-    minContainerHeight: React.PropTypes.number,
-    minCanvasWidth: React.PropTypes.number,
-    minCanvasHeight: React.PropTypes.number,
-    minCropBoxWidth: React.PropTypes.number,
-    minCropBoxHeight: React.PropTypes.number,
-    build: React.PropTypes.func,
-    built: React.PropTypes.func,
-    dragstart: React.PropTypes.func,
-    dragmove: React.PropTypes.func,
-    dragend: React.PropTypes.func,
-    zoomin: React.PropTypes.func,
-    zoomout: React.PropTypes.func
-  },
+const unchangeableProps = optionProps.slice(3);
 
-  getDefaultProps() {
-    return {
-      src: null
-    };
-  },
+class ReactCropper extends Component {
 
   componentDidMount() {
-    var options = {};
-    for(var prop in this.props){
-      if(prop !== 'src' && prop !== 'alt' && prop !== 'crossOrigin'){
-        options[prop] = this.props[prop];
-      }
-    }
-    this.$img = $(this.refs.img);
-    this.$img.cropper(options);
-  },
+    const options = Object.keys(this.props)
+    .filter(propKey => optionProps.indexOf(propKey) !== -1)
+    .reduce((prevOptions, propKey) =>
+      Object.assign({}, prevOptions, { [propKey]: this.props[propKey] })
+    , {});
+
+    this.img = ReactDOM.findDOMNode(this.refs.img);
+    this.cropper = new Cropper(this.img, options);
+  }
 
   componentWillReceiveProps(nextProps) {
-    if(nextProps.src !== this.props.src){
-      this.replace(nextProps.src);
+    if (nextProps.src !== this.props.src) {
+      this.cropper.reset().clear().replace(nextProps.src);
     }
-    if(nextProps.aspectRatio !== this.props.aspectRatio){
+    if (nextProps.aspectRatio !== this.props.aspectRatio) {
       this.setAspectRatio(nextProps.aspectRatio);
     }
-  },
+    if (nextProps.data !== this.props.data) {
+      this.setData(nextProps.data);
+    }
+    if (nextProps.dragMode !== this.props.dragMode) {
+      this.setDragMode(nextProps.dragMode);
+    }
+    if (nextProps.cropBoxData !== this.props.cropBoxData) {
+      this.setCropBoxData(nextProps.cropBoxData);
+    }
+    if (nextProps.canvasData !== this.props.canvasData) {
+      this.setCanvasData(nextProps.canvasData);
+    }
+    if (nextProps.moveTo !== this.props.moveTo) {
+      if (nextProps.moveTo.length > 1) {
+        this.moveTo(nextProps.moveTo[0], nextProps.moveTo[1]);
+      } else {
+        this.moveTo(nextProps.moveTo[0]);
+      }
+    }
+    if (nextProps.zoomTo !== this.props.zoomTo) {
+      this.zoomTo(nextProps.zoomTo);
+    }
+    if (nextProps.rotateTo !== this.props.rotateTo) {
+      this.rotateTo(nextProps.rotateTo);
+    }
+    if (nextProps.scaleX !== this.props.scaleX) {
+      this.scaleX(nextProps.scaleX);
+    }
+    if (nextProps.scaleY !== this.props.scaleY) {
+      this.scaleY(nextProps.scaleY);
+    }
+    if (nextProps.enable !== this.props.enable) {
+      if (nextProps.enable) {
+        this.enable();
+      } else {
+        this.disable();
+      }
+    }
+
+    for (const propKey in nextProps) {
+      if (nextProps[propKey] !== this.props[propKey]
+        && unchangeableProps.indexOf(propKey) !== -1) {
+        throw new Error(`prop: ${propKey} can't be change after componentDidMount`);
+      }
+    }
+  }
 
   componentWillUnmount() {
-    if(this.$img) {
+    if (this.img) {
       // Destroy the cropper, this makes sure events such as resize are cleaned up and do not leak
-      this.$img.cropper('destroy');
-      // While we're at it remove our reference to the jQuery instance
-      delete this.$img;
+      this.cropper.destroy();
+      delete this.img;
+      delete this.cropper;
     }
-  },
+  }
 
-  move(offsetX, offsetY){
-    return this.$img.cropper('move', offsetX, offsetY);
-  },
+  setDragMode(mode) {
+    return this.cropper.setDragMode(mode);
+  }
 
-  zoom(ratio){
-    return this.$img.cropper('zoom', ratio);
-  },
+  setAspectRatio(aspectRatio) {
+    return this.cropper.setAspectRatio(aspectRatio);
+  }
 
-  rotate(degree){
-    return this.$img.cropper('rotate', degree);
-  },
+  getCroppedCanvas(options) {
+    return this.cropper.getCroppedCanvas(options);
+  }
 
-  enable(){
-    return this.$img.cropper('enable');
-  },
+  setCropBoxData(data) {
+    return this.cropper.setCropBoxData(data);
+  }
 
-  disable(){
-    return this.$img.cropper('disable');
-  },
+  getCropBoxData() {
+    return this.cropper.getCropBoxData();
+  }
 
-  reset(){
-    return this.$img.cropper('reset');
-  },
+  setCanvasData(data) {
+    return this.cropper.setCanvasData(data);
+  }
 
-  clear(){
-    return this.$img.cropper('clear');
-  },
+  getCanvasData() {
+    return this.cropper.getCanvasData();
+  }
 
-  replace(url){
-    return this.$img.cropper('replace', url);
-  },
+  getImageData() {
+    return this.cropper.getImageData();
+  }
 
-  getData(rounded){
-    return this.$img.cropper('getData', rounded);
-  },
+  getContainerData() {
+    return this.cropper.getContainerData();
+  }
 
-  getContainerData(){
-    return this.$img.cropper('getContainerData');
-  },
+  setData(data) {
+    return this.cropper.setData(data);
+  }
 
-  getImageData(){
-    return this.$img.cropper('getImageData');
-  },
+  getData(rounded) {
+    return this.cropper.getData(rounded);
+  }
 
-  getCanvasData(){
-    return this.$img.cropper('getCanvasData');
-  },
+  crop() {
+    return this.cropper.crop();
+  }
 
-  setCanvasData(data){
-    return this.$img.cropper('setCanvasData', data);
-  },
+  move(offsetX, offsetY) {
+    return this.cropper.move(offsetX, offsetY);
+  }
 
-  getCropBoxData(){
-    return this.$img.cropper('getCropBoxData');
-  },
+  moveTo(x, y) {
+    return this.cropper.moveTo(x, y);
+  }
 
-  setCropBoxData(data){
-    return this.$img.cropper('setCropBoxData', data);
-  },
+  zoom(ratio) {
+    return this.cropper.zoom(ratio);
+  }
 
-  getCroppedCanvas(options){
-    return this.$img.cropper('getCroppedCanvas', options);
-  },
+  zoomTo(ratio) {
+    return this.cropper.zoomTo(ratio);
+  }
 
-  setAspectRatio(aspectRatio){
-    return this.$img.cropper('setAspectRatio', aspectRatio);
-  },
+  rotate(degree) {
+    return this.cropper.rotate(degree);
+  }
 
-  setDragMode(){
-    return this.$img.cropper('setDragMode');
-  },
+  rotateTo(degree) {
+    return this.cropper.rotateTo(degree);
+  }
 
-  on(eventname, callback){
-    return this.$img.on(eventname, callback);
-  },
+  enable() {
+    return this.cropper.enable();
+  }
+
+  disable() {
+    return this.cropper.disable();
+  }
+
+  reset() {
+    return this.cropper.reset();
+  }
+
+  clear() {
+    return this.cropper.clear();
+  }
+
+  replace(url, onlyColorChanged) {
+    return this.cropper.replace(url, onlyColorChanged);
+  }
+
+  scale(scaleX, scaleY) {
+    return this.cropper.scale(scaleX, scaleY);
+  }
+
+  scaleX(scaleX) {
+    return this.cropper.scaleX(scaleX);
+  }
+
+  scaleY(scaleY) {
+    return this.cropper.scaleY(scaleY);
+  }
 
   render() {
+    const {
+      src,
+      alt,
+      crossOrigin,
+    } = this.props;
+
     return (
-      <div {...this.props} src={null} crossOrigin={null} alt={null}>
+      <div
+        {...this.props}
+        src={null}
+        crossOrigin={null}
+        alt={null}
+      >
         <img
-          crossOrigin={this.props.crossOrigin}
-          ref='img'
-          src={this.props.src}
-          alt={this.props.alt === undefined ? 'picture' : this.props.alt}
-          style={{opacity: 0}}
-          />
+          crossOrigin={crossOrigin}
+          ref="img"
+          src={src}
+          alt={alt === undefined ? 'picture' : alt}
+          style={{ opacity: 0 }}
+        />
       </div>
     );
   }
-});
+}
 
-export default Cropper;
+ReactCropper.propTypes = {
+  // react cropper options
+  crossOrigin: PropTypes.string,
+  src: PropTypes.string,
+  alt: PropTypes.string,
+
+  // props of option can be changed after componentDidmount
+  aspectRatio: PropTypes.number,
+  dragMode: PropTypes.oneOf(['crop', 'move', 'none']),
+  data: PropTypes.shape({
+    x: PropTypes.number,
+    y: PropTypes.number,
+    width: PropTypes.number,
+    height: PropTypes.number,
+    rotate: PropTypes.number,
+    scaleX: PropTypes.number,
+    scaleY: PropTypes.number,
+  }),
+  scaleX: PropTypes.number,
+  scaleY: PropTypes.number,
+  enable: PropTypes.bool,
+  cropBoxData: PropTypes.shape({
+    left: PropTypes.number,
+    top: PropTypes.number,
+    width: PropTypes.number,
+    hegiht: PropTypes.number,
+  }),
+  canvasData: PropTypes.shape({
+    left: PropTypes.number,
+    top: PropTypes.number,
+    width: PropTypes.number,
+    hegiht: PropTypes.number,
+  }),
+  zoomTo: PropTypes.number,
+  moveTo: PropTypes.arrayOf(PropTypes.number),
+  rotateTo: PropTypes.number,
+
+  // cropperjs options
+  // https://github.com/fengyuanchen/cropperjs#options
+  // aspectRatio, dragMode, data
+  viewMode: PropTypes.oneOf([0, 1, 2, 3]),
+  preview: PropTypes.string,
+  responsive: PropTypes.bool,
+  restore: PropTypes.bool,
+  checkCrossOrigin: PropTypes.bool,
+  checkOrientation: PropTypes.bool,
+  modal: PropTypes.bool,
+  guides: PropTypes.bool,
+  center: PropTypes.bool,
+  highlight: PropTypes.bool,
+  background: PropTypes.bool,
+  autoCrop: PropTypes.bool,
+  autoCropArea: PropTypes.number,
+  movable: PropTypes.bool,
+  rotatable: PropTypes.bool,
+  scalable: PropTypes.bool,
+  zoomable: PropTypes.bool,
+  zoomOnTouch: PropTypes.bool,
+  zoomOnWheel: PropTypes.bool,
+  wheelZoomRation: PropTypes.number,
+  cropBoxMovable: PropTypes.bool,
+  cropBoxResizable: PropTypes.bool,
+  toggleDragModeOnDblclick: PropTypes.bool,
+  minContainerWidth: PropTypes.number,
+  minContainerHeight: PropTypes.number,
+  minCanvasWidth: PropTypes.number,
+  minCanvasHeight: PropTypes.number,
+  minCropBoxWidth: PropTypes.number,
+  minCropBoxHeight: PropTypes.number,
+  build: PropTypes.func,
+  built: PropTypes.func,
+  cropstart: PropTypes.func,
+  cropmove: PropTypes.func,
+  cropend: PropTypes.func,
+  crop: PropTypes.func,
+  zoom: PropTypes.func,
+};
+
+ReactCropper.defaultProps = {
+  src: null,
+  dragMode: 'crop',
+  data: null,
+  scaleX: 1,
+  scaleY: 1,
+  enable: true,
+  zoomTo: 1,
+  rotateTo: 0,
+};
+
+export default ReactCropper;
